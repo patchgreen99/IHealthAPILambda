@@ -64,22 +64,25 @@ def retrieveMetricFromIHealthAPI(metric, period, credentials):
 
     dataset = {}
 
+    # derive the specififc API keys
     timeserieskey = IHEALTH_METRICS[metric]['acronym'] + 'DataList'
     unitkey = IHEALTH_METRICS[metric]['acronym'] + 'Unit'
-    records = response[timeserieskey]
 
-    for record in records:
+    for record in response[timeserieskey]:
         current_date_fitsense = convertToFitSenseDateFormat(record['MDate'], record['TimeZone'])
+        dataset.setdefault(current_date_fitsense, default=[])
 
-        dataset[current_date_fitsense] = {'unit': record[unitkey]}
-        for value in IHEALTH_METRICS['values']:
-            dataset[current_date_fitsense][value] = record[value]
+        # append measurements under the date they were made
+        measurement = {'unit': record[unitkey], 'MDate': record['MDate'], 'TimeZone': record['TimeZone']}
+        measurement.update({value: record[value] for value in IHEALTH_METRICS['values']})
+        dataset[current_date_fitsense].append(measurement)
     return dataset
 
 
 def convertToFitSenseDateFormat(unix_timestamp, timezone):
     # timezone format is -0600 (minus 6 hours) so it needs applying to the unixtimestamp
-    timestamp = int(unix_timestamp) + int(timezone[:3]) * 60 * 60 + int(timezone[0]+timezone[-2:]) * 60
+    # - is the sign, 06 is the hour difference , 00 is the minutes difference
+    timestamp = int(unix_timestamp) + int(timezone[0]+'1') * (int(timezone[1:3]) * 60 * 60 + int(timezone[-2:]) * 60)
     date_object = datetime.fromtimestamp(timestamp).date()
     fitsense_date_string = date_object.strftime(DATE_FORMAT_FITSENSE)
     return fitsense_date_string
